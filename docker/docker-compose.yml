@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  postgres:
+    container_name: postgresql
+    image: pgvector/pgvector:pg17
+    command: ["postgres", "-c", "max_connections=1000"]
+    restart: always
+    ports:
+      - "5432:5432"
+    env_file:
+      - ../.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts:/docker-entrypoint-initdb.d
+    networks:
+      - rag-net
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    ports:
+      - "4000:80"
+    env_file:
+      - ../.env
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - rag-net
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+networks:
+  rag-net:
+    driver: bridge

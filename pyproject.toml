@@ -6,5 +6,22 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.16.4",
+    "fastapi>=0.116.1",
+    "pydantic-settings>=2.10.1",
+    "pydantic>=2.11.7",
     "python-dotenv>=1.1.1",
+    "sqlalchemy>=2.0.42",
+    "pgvector>=0.4.1",
+    "httpx>=0.28.1",
+    "asyncpg>=0.30.0",
+    "python-multipart>=0.0.20",
+    "uvicorn>=0.35.0",
+    "pdfminer-six>=20250506",
 ]
+
+[tool.setuptools]
+package-dir = {"" = "backend"}
+[tool.setuptools.packages.find]
+where = ["backend"]
+include = ["app*"]
+exclude = ["alembic*", "docker*"]

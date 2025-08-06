@@ -22,14 +22,14 @@ Este projeto implementa um sistema completo de **Retrieval-Augmented Generation 
 
 - [Docker](https://www.docker.com/)  
 - [Python 3.12+](https://www.python.org/downloads/)  
-- [uv (opcional)](https://github.com/astral-sh/uv)
+- [uv](https://docs.astral.sh/uv/)
 
 ## 📦 Instalação
 
 ### 1. Clone o repositório
 
 ```bash
-git clone https://github.com/seu-usuario/rag.git
+git clone https://github.com/lusabo/rag.git
 cd rag
 ```
 

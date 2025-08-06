@@ -1,69 +1,49 @@
+import io
 from typing import List
-from io import BytesIO
-from pdfminer.high_level import extract_pages
-from pdfminer.layout import LTTextContainer, LTTextBox, LTTextLine
+from pypdf import PdfReader
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models import File, Chunk
-from app.services.chunker import chunk_text, clean_text
 from app.services.embedder import get_embedder
+from app.models import File, Chunk
 from app.core.config import settings
 
-def extract_text_by_page(pdf_bytes: bytes) -> List[str]:
-    pages_text: List[str] = []
-    for page_layout in extract_pages(BytesIO(pdf_bytes)):
-        lines: List[str] = []
-        for element in page_layout:
-            if isinstance(element, (LTTextContainer, LTTextBox, LTTextLine)):
-                text = element.get_text()
-                if text:
-                    lines.append(text)
-        pages_text.append("\n".join(lines))
-    return pages_text
+def chunk_text(text: str, max_chars: int = 1000, overlap: int = 200):
+    i, n = 0, len(text)
+    while i < n:
+        yield text[i:i+max_chars]
+        i += max_chars - overlap
 
-def rough_token_count(s: str) -> int:
-    return max(1, len(s.split()))
-
-async def ingest_pdf(
-    session: AsyncSession,
-    filename: str,
-    mime_type: str,
-    pdf_bytes: bytes,
-) -> File:
-    # 1) salva o arquivo bruto
-    f = File(filename=filename, mime_type=mime_type, content=pdf_bytes)
+async def ingest_pdf(session: AsyncSession, filename: str, mime_type: str, data: bytes) -> File:
+    f = File(filename=filename, mime_type=mime_type, data=data)  # se você salva o PDF bruto na tabela
     session.add(f)
     await session.flush()  # f.id disponível
 
-    # 2) extrai texto por página
-    pages = extract_text_by_page(pdf_bytes)
-    if not any(p.strip() for p in pages):
-        raise ValueError("Não foi possível extrair texto do PDF.")
+    reader = PdfReader(io.BytesIO(data))
+    chunk_payload: List[tuple[int,int,str]] = []
+    for page_no, page in enumerate(reader.pages, start=1):
+        text = page.extract_text() or ""
+        for j, ch in enumerate(chunk_text(text)):
+            chunk_payload.append((page_no, j, ch))
 
-    # 3) chunking por página
-    records: List[tuple[int, int, str]] = []  # (page_number, chunk_index, text)
-    for pno, page_text in enumerate(pages, start=1):
-        pieces = chunk_text(page_text)
-        for idx, piece in enumerate(pieces):
-            records.append((pno, idx, piece))
+    if not chunk_payload:
+        await session.commit()
+        return f
 
-    # 4) embeddings em lote
-    texts = [r[2] for r in records]
     embedder = get_embedder()
-    vectors = await embedder.embed(texts)
-    if any(len(v) != settings.embedding_dim for v in vectors):
-        raise RuntimeError("Dimensão do embedding diferente de 1536.")
+    # batch embeddings
+    texts = [c[2] for c in chunk_payload]
+    embeds = await embedder.embed(texts)
 
-    # 5) persiste chunks
-    for (pno, idx, piece), emb in zip(records, vectors):
-        session.add(Chunk(
+    chunks = [
+        Chunk(
             file_id=f.id,
-            page_number=pno,
+            page_number=page_no,
             chunk_index=idx,
-            text_cleaned=clean_text(piece),
-            embedding=emb,
-            token_count=rough_token_count(piece),
-        ))
-
+            text_cleaned=txt,
+            embedding=vec,        # list[float] – OK se sua coluna é VECTOR(1536/3072) com pgvector
+            token_count=len(txt),
+        )
+        for (page_no, idx, txt), vec in zip(chunk_payload, embeds)
+    ]
+    session.add_all(chunks)
     await session.commit()
-    await session.refresh(f)
     return f

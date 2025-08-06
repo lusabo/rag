@@ -88,14 +88,16 @@ streamlit run frontend/app.py
 
 ### 📁 Estrutura
 
+```bash
 rag/
+├── alembic/
 ├── backend/
 ├── docker/
-├── alembic/
-├── app_streamlit.py
+├── frontend/
 ├── .env
+├── alembic.ini
 └── pyproject.toml
-
+```
 ### 🤝 Contribua
 
 Pull requests são bem-vindos! 🙌

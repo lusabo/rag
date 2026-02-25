@@ -13,7 +13,7 @@ def chunk_text(text: str, max_chars: int = 1000, overlap: int = 200):
         i += max_chars - overlap
 
 async def ingest_pdf(session: AsyncSession, filename: str, mime_type: str, data: bytes) -> File:
-    f = File(filename=filename, mime_type=mime_type, data=data)  # se você salva o PDF bruto na tabela
+    f = File(filename=filename, mime_type=mime_type, content=data)  # se você salva o PDF bruto na tabela
     session.add(f)
     await session.flush()  # f.id disponível
 
